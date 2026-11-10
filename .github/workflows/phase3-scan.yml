@@ -47,6 +47,7 @@ jobs:
           fi
 
       - name: Pull, scan and push the state
+        id: scan
         timeout-minutes: 345
         env:
           GH_REPO: ${{ env.STATE_REPO }}
@@ -79,3 +80,13 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: gh workflow run phase3-scan.yml
+
+      - name: Send a WhatsApp message
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.STATE_TOKEN }}
+          GH_REPO: ${{ env.STATE_REPO }}
+          WHATSAPP_PHONE: ${{ secrets.WHATSAPP_PHONE }}
+          CALLMEBOT_APIKEY: ${{ secrets.CALLMEBOT_APIKEY }}
+        run: |
+          python -m phase3.notify --outcome "${{ steps.scan.outcome }}" --finished "${{ steps.finished.outputs.complete || 'false' }}" --run-url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" || true
