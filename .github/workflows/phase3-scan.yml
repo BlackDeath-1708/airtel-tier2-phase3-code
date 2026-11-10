@@ -2,8 +2,8 @@ name: phase3-scan
 
 # Runs the Phase 3 scan on a schedule, or when started by hand. The scan state (progress, results and the
 # live summary) lives in a private repository, not here. Each run pulls that state, scans, and pushes it back,
-# even when it is stopped at the time limit. Runs are queued, never parallel. A run that finds the scan
-# complete does nothing.
+# even when it is stopped at the time limit. A run that stops before the scan is complete starts the next run
+# itself, so the scan carries on without waiting for the schedule. Runs are queued, never parallel.
 on:
   schedule:
     - cron: "0 */6 * * *"
@@ -11,6 +11,8 @@ on:
 
 permissions:
   contents: read
+  # Lets a run start the next one when it stops at the time limit.
+  actions: write
 
 concurrency:
   group: phase3-scan
@@ -52,6 +54,28 @@ jobs:
           set -o pipefail
           mkdir -p output
           # Stop the scan 20 minutes before the job limit. The stop signal pauses it after the current unit,
-          # and the final push then saves the state and releases the lock for the next scheduled run.
+          # and the final push then saves the state and releases the lock for the next run.
           # --preserve-status keeps the scan's own exit code, so a stopped run is not reported as a failure.
           timeout --preserve-status --signal=TERM --kill-after=10m 320m python -u -m phase3 sync run --owner github --workers 12 2>&1 | tee output/phase3_console.log
+
+      - name: Check whether the scan is complete
+        id: finished
+        if: success()
+        env:
+          GH_TOKEN: ${{ secrets.STATE_TOKEN }}
+          GH_REPO: ${{ env.STATE_REPO }}
+        run: |
+          status=$(python -m phase3 sync status | python -c "import json,sys; print(json.load(sys.stdin).get('run_status') or '')")
+          echo "run_status=$status"
+          if [ "$status" = "complete" ]; then
+            echo "complete=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "complete=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Start the next run
+        if: success() && steps.finished.outputs.complete == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: gh workflow run phase3-scan.yml
