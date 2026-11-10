@@ -1,0 +1,57 @@
+name: phase3-scan
+
+# Runs the Phase 3 scan on a schedule, or when started by hand. The scan state (progress, results and the
+# live summary) lives in a private repository, not here. Each run pulls that state, scans, and pushes it back,
+# even when it is stopped at the time limit. Runs are queued, never parallel. A run that finds the scan
+# complete does nothing.
+on:
+  schedule:
+    - cron: "0 */6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: phase3-scan
+  cancel-in-progress: false
+
+env:
+  STATE_REPO: BlackDeath-1708/airtel-tier2-phase3
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 355
+    env:
+      GLOBALPING_TOKENS: ${{ secrets.GLOBALPING_TOKENS }}
+      # A fine-grained token that can read and write the state repository only.
+      GH_TOKEN: ${{ secrets.STATE_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - name: Check the secrets are set
+        run: |
+          if [ -z "$GH_TOKEN" ] || [ -z "$GLOBALPING_TOKENS" ]; then
+            echo "The STATE_TOKEN and GLOBALPING_TOKENS secrets must both be set." >&2
+            exit 1
+          fi
+
+      - name: Pull, scan and push the state
+        timeout-minutes: 345
+        env:
+          GH_REPO: ${{ env.STATE_REPO }}
+        run: |
+          set -o pipefail
+          mkdir -p output
+          # Stop the scan 20 minutes before the job limit. The stop signal pauses it after the current unit,
+          # and the final push then saves the state and releases the lock for the next scheduled run.
+          # --preserve-status keeps the scan's own exit code, so a stopped run is not reported as a failure.
+          timeout --preserve-status --signal=TERM --kill-after=10m 320m python -u -m phase3 sync run --owner github --workers 12 2>&1 | tee output/phase3_console.log

@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+
+# Scan output and logs stay in the private state repository, never here.
+output/
+logs/
+
+# Credentials: never commit these.
+.env
+.streamlit/secrets.toml
+live/.streamlit/secrets.toml
