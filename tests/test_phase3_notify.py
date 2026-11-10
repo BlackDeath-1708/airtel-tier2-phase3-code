@@ -81,3 +81,27 @@ def test_main_sends_the_message_with_the_scan_status(monkeypatch):
     assert notify.main(["--outcome", "success", "--finished", "false", "--run-url", RUN_URL]) == 0
 
     assert sent and "116,855" in sent[0][0] and sent[0][1] == WEBHOOK
+
+
+def test_progress_message_says_whether_it_is_running_and_when_it_was_last_updated():
+    status = dict(STATUS, running_on="github", updated_at="2026-11-10T13:08:59+00:00")
+
+    text = notify.build_message("progress", False, status, "")
+
+    assert "Phase 3 scan update: running (paused)" in text
+    assert "Last update: 2026-11-10T13:08:59+00:00" in text
+    assert "116,855 of 1,430,376 units" in text
+
+
+def test_progress_message_says_not_running_when_nobody_holds_the_scan():
+    status = dict(STATUS, running_on=None, updated_at="2026-11-10T13:08:59+00:00")
+
+    text = notify.build_message("progress", False, status, "")
+
+    assert "not running" in text
+
+
+def test_progress_message_says_the_status_is_unavailable_when_it_cannot_be_read():
+    text = notify.build_message("progress", False, None, "")
+
+    assert "Phase 3 scan update: status unavailable" in text

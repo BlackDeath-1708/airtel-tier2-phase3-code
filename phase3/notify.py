@@ -16,18 +16,34 @@ DISCORD_MESSAGE_LIMIT = 2000
 DISCORD_OK_STATUSES = (200, 204)
 
 
-def build_message(outcome, finished, status, run_url):
+def _progress_heading(status):
+    if status is None:
+        return "Phase 3 scan update: status unavailable"
+    state = "running" if status.get("running_on") else "not running"
+    return f"Phase 3 scan update: {state} ({status.get('run_status') or 'no run yet'})"
+
+
+def _result_heading(outcome, finished):
     if outcome == "success" and finished:
-        heading = "Phase 3 scan COMPLETE"
-    elif outcome == "success":
-        heading = "Phase 3 scan paused at its time limit; the next run starts automatically"
+        return "Phase 3 scan COMPLETE"
+    if outcome == "success":
+        return "Phase 3 scan paused at its time limit; the next run starts automatically"
+    return f"Phase 3 scan STOPPED with an error ({outcome})"
+
+
+def build_message(outcome, finished, status, run_url):
+    """A progress update (outcome "progress") on the schedule, or the result of a run."""
+    if outcome == "progress":
+        lines = [_progress_heading(status)]
     else:
-        heading = f"Phase 3 scan STOPPED with an error ({outcome})"
-    lines = [heading]
+        lines = [_result_heading(outcome, finished)]
     if status and status.get("units_total"):
         done, total = status.get("units_done", 0), status["units_total"]
         lines.append(f"{done:,} of {total:,} units ({100 * done / total:.1f}%)")
-    lines.append(run_url)
+    if outcome == "progress" and status and status.get("updated_at"):
+        lines.append(f"Last update: {status['updated_at']}")
+    if run_url:
+        lines.append(run_url)
     return "\n".join(lines)[:DISCORD_MESSAGE_LIMIT]
 
 
