@@ -1,7 +1,7 @@
-"""Sends a WhatsApp message through CallMeBot when a scan run pauses, completes or fails.
+"""Posts a scan alert to a Discord channel when a scan run pauses, completes or fails.
 
-Settings come from the environment: WHATSAPP_PHONE (country code and digits, e.g. 917700000000) and
-CALLMEBOT_APIKEY. The key is never printed: a failed send reports only the error type.
+The setting comes from the environment: DISCORD_WEBHOOK_URL. The URL is never printed: a failed send
+reports only the error type, because a request error can contain the URL.
 """
 
 import argparse
@@ -12,7 +12,8 @@ import requests
 
 from phase3 import sync
 
-CALLMEBOT_URL = "https://api.callmebot.com/whatsapp.php"
+DISCORD_MESSAGE_LIMIT = 2000
+DISCORD_OK_STATUSES = (200, 204)
 
 
 def build_message(outcome, finished, status, run_url):
@@ -27,15 +28,15 @@ def build_message(outcome, finished, status, run_url):
         done, total = status.get("units_done", 0), status["units_total"]
         lines.append(f"{done:,} of {total:,} units ({100 * done / total:.1f}%)")
     lines.append(run_url)
-    return "\n".join(lines)
+    return "\n".join(lines)[:DISCORD_MESSAGE_LIMIT]
 
 
-def send(text, phone, apikey):
-    if not phone or not apikey:
-        raise ValueError("WHATSAPP_PHONE and CALLMEBOT_APIKEY must both be set")
-    response = requests.get(CALLMEBOT_URL, params={"phone": phone, "text": text, "apikey": apikey}, timeout=30)
-    if response.status_code != 200:
-        raise RuntimeError(f"CallMeBot answered with HTTP {response.status_code}")
+def send(text, webhook_url):
+    if not webhook_url:
+        raise ValueError("DISCORD_WEBHOOK_URL must be set")
+    response = requests.post(webhook_url, json={"content": text}, timeout=30)
+    if response.status_code not in DISCORD_OK_STATUSES:
+        raise RuntimeError(f"Discord answered with HTTP {response.status_code}")
 
 
 def main(argv):
@@ -50,12 +51,11 @@ def main(argv):
         status = None
     text = build_message(args.outcome, args.finished == "true", status, args.run_url)
     try:
-        send(text, os.environ.get("WHATSAPP_PHONE", ""), os.environ.get("CALLMEBOT_APIKEY", ""))
+        send(text, os.environ.get("DISCORD_WEBHOOK_URL", ""))
     except (requests.RequestException, RuntimeError, ValueError) as error:
-        # Print the type only: a request error can contain the key in its URL.
-        print(f"Could not send the WhatsApp message ({type(error).__name__}).", file=sys.stderr)
+        print(f"Could not send the Discord message ({type(error).__name__}).", file=sys.stderr)
         return 1
-    print("WhatsApp message sent.")
+    print("Discord message sent.")
     return 0
 
 

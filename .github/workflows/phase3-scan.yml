@@ -81,12 +81,11 @@ jobs:
           GH_REPO: ${{ github.repository }}
         run: gh workflow run phase3-scan.yml
 
-      - name: Send a WhatsApp message
+      - name: Send a Discord message
         if: always()
         env:
           GH_TOKEN: ${{ secrets.STATE_TOKEN }}
           GH_REPO: ${{ env.STATE_REPO }}
-          WHATSAPP_PHONE: ${{ secrets.WHATSAPP_PHONE }}
-          CALLMEBOT_APIKEY: ${{ secrets.CALLMEBOT_APIKEY }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
         run: |
           python -m phase3.notify --outcome "${{ steps.scan.outcome }}" --finished "${{ steps.finished.outputs.complete || 'false' }}" --run-url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" || true
