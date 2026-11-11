@@ -55,6 +55,14 @@ def send(text, webhook_url):
         raise RuntimeError(f"Discord answered with HTTP {response.status_code}")
 
 
+def post_progress(owner):
+    """Posts the scan's current progress. Called by the running scan every PROGRESS_EVERY_BEATS heartbeats."""
+    webhook = os.environ.get("DISCORD_WEBHOOK_URL", "")
+    if not webhook:
+        return
+    send(build_message("progress", False, sync.current_status(owner, owner), ""), webhook)
+
+
 def main(argv):
     parser = argparse.ArgumentParser(prog="python -m phase3.notify")
     parser.add_argument("--outcome", required=True, help="the scan step's outcome: success, failure, cancelled or skipped")

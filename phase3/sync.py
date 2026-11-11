@@ -28,6 +28,7 @@ VIEW_FILE = "view.json"
 TARGETS_NAME = "phase3_targets_selected.csv"  # the target list is kept as a release asset, not in git
 HEARTBEAT_SEC = 10 * 60
 CHECKPOINT_EVERY = 3  # the whole state is saved every third heartbeat (30 minutes)
+PROGRESS_EVERY_BEATS = 12  # a progress update every 2 hours (12 heartbeats of 10 minutes)
 LOCK_STALE_SEC = 45 * 60
 
 
@@ -176,7 +177,7 @@ def lock(owner):
     _publish_status(current_status(owner, owner))
 
 
-def heartbeat_loop(owner, stop_event):
+def heartbeat_loop(owner, stop_event, on_progress=None):
     """Keeps the lock fresh and saves the state while a long run is going. Stops when stop_event is set.
 
     A run that is cancelled or hits its time limit never reaches the final push, so the state is also
@@ -194,3 +195,8 @@ def heartbeat_loop(owner, stop_event):
             _publish_status(current_status(owner, owner))
         except (subprocess.CalledProcessError, OSError) as error:
             print(f"Could not update the status just now; retrying on the next heartbeat: {error}", flush=True)
+        if on_progress and beats % PROGRESS_EVERY_BEATS == 0:
+            try:
+                on_progress()
+            except Exception as error:  # a failed post must never stop the heartbeat
+                print(f"Could not post the progress update just now: {type(error).__name__}", flush=True)

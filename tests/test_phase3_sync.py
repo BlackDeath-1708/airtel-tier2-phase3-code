@@ -153,3 +153,23 @@ def test_pull_keeps_a_target_list_that_is_already_here(scan_folder, tmp_path, mo
 
     assert not any(sync.TARGETS_NAME in c for c in calls)
     assert targets.read_text(encoding="utf-8") == "already here\n"
+
+
+def test_heartbeat_calls_the_progress_callback_every_two_hours(beating):
+    calls = []
+
+    sync.heartbeat_loop("github", _Beats(2 * sync.PROGRESS_EVERY_BEATS), on_progress=lambda: calls.append("update"))
+
+    assert len(calls) == 2
+
+
+def test_a_failed_progress_update_does_not_stop_the_heartbeat(beating, capsys):
+    published, _ = beating
+
+    def broken():
+        raise RuntimeError("discord is down")
+
+    sync.heartbeat_loop("github", _Beats(sync.PROGRESS_EVERY_BEATS), on_progress=broken)
+
+    assert len(published) == sync.PROGRESS_EVERY_BEATS
+    assert "RuntimeError" in capsys.readouterr().out

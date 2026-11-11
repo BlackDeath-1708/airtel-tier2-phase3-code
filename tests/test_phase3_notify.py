@@ -105,3 +105,24 @@ def test_progress_message_says_the_status_is_unavailable_when_it_cannot_be_read(
     text = notify.build_message("progress", False, None, "")
 
     assert "Phase 3 scan update: status unavailable" in text
+
+
+def test_post_progress_sends_the_current_status_to_the_webhook(monkeypatch):
+    sent = []
+    monkeypatch.setattr(notify, "send", lambda text, webhook: sent.append((text, webhook)))
+    monkeypatch.setattr(sync, "current_status", lambda owner, running_on: dict(STATUS, running_on=running_on, updated_at="2026-11-11T02:00:00+00:00"))
+    monkeypatch.setenv("DISCORD_WEBHOOK_URL", WEBHOOK)
+
+    notify.post_progress("github")
+
+    assert sent and "running" in sent[0][0] and "116,855" in sent[0][0] and sent[0][1] == WEBHOOK
+
+
+def test_post_progress_does_nothing_without_a_webhook(monkeypatch):
+    sent = []
+    monkeypatch.setattr(notify, "send", lambda text, webhook: sent.append(text))
+    monkeypatch.delenv("DISCORD_WEBHOOK_URL", raising=False)
+
+    notify.post_progress("github")
+
+    assert sent == []

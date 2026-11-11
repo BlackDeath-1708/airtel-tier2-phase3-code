@@ -24,7 +24,7 @@ from phase3.checkpoint import completed_units_to_skip, load_manifest, save_manif
 from phase3.globalping import GlobalpingClient, fetch_india_probes
 from phase3.plan import build_plan, first_run_items, total_traceroutes
 from phase3.runner import run_items
-from phase3 import sync
+from phase3 import notify, sync
 from phase3.runs import failed_items, failed_rows, latest_run_number, read_state, run_paths, write_state
 from phase3.targets import load_targets, sha256_file
 
@@ -248,7 +248,7 @@ def cmd_sync(args):
         sync.pull()
         sync.lock(args.owner)
         stop_heartbeat = threading.Event()
-        heartbeat = threading.Thread(target=sync.heartbeat_loop, args=(args.owner, stop_heartbeat), daemon=True)
+        heartbeat = threading.Thread(target=sync.heartbeat_loop, args=(args.owner, stop_heartbeat, notify.post_progress), daemon=True)
         heartbeat.start()
         try:
             cmd_supervise(argparse.Namespace(workers=args.workers, limit_ips=None, cities=None))

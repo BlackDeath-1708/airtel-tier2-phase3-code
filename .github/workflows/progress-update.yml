@@ -1,10 +1,9 @@
 name: phase3-progress-update
 
-# Posts the scan's progress to the Discord channel every 2 hours, and on demand. It only reads the saved
-# status, so it does not take the scan's lock and does not start a scan.
+# Posts the scan's progress to the Discord channel on demand. The running scan posts every 2 hours itself,
+# because GitHub's schedule does not start these runs reliably. This only reads the saved status, so it does
+# not take the scan's lock and does not start a scan.
 on:
-  schedule:
-    - cron: "0 */2 * * *"
   workflow_dispatch:
 
 permissions:
