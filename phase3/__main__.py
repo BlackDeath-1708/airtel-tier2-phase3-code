@@ -248,7 +248,7 @@ def cmd_sync(args):
         sync.pull()
         sync.lock(args.owner)
         stop_heartbeat = threading.Event()
-        heartbeat = threading.Thread(target=sync.heartbeat_loop, args=(args.owner, stop_heartbeat, notify.post_progress), daemon=True)
+        heartbeat = threading.Thread(target=sync.heartbeat_loop, args=(args.owner, stop_heartbeat, lambda: notify.post_progress(args.owner)), daemon=True)
         heartbeat.start()
         try:
             cmd_supervise(argparse.Namespace(workers=args.workers, limit_ips=None, cities=None))
